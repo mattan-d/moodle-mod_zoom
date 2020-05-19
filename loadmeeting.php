@@ -25,17 +25,20 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-require_once(dirname(dirname(dirname(__FILE__))).'/config.php');
+require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
 require_once($CFG->libdir . '/gradelib.php');
 require_once($CFG->libdir . '/moodlelib.php');
-require_once(dirname(__FILE__).'/locallib.php');
+require_once(dirname(__FILE__) . '/locallib.php');
+require_once(dirname(__FILE__) . '/classes/webservice.php');
+
+$webservice = new mod_zoom_webservice();
 
 // Course_module ID.
 $id = required_param('id', PARAM_INT);
 if ($id) {
-    $cm         = get_coursemodule_from_id('zoom', $id, 0, false, MUST_EXIST);
-    $course     = get_course($cm->course);
-    $zoom  = $DB->get_record('zoom', array('id' => $cm->instance), '*', MUST_EXIST);
+    $cm = get_coursemodule_from_id('zoom', $id, 0, false, MUST_EXIST);
+    $course = get_course($cm->course);
+    $zoom = $DB->get_record('zoom', array('id' => $cm->instance), '*', MUST_EXIST);
 } else {
     print_error('You must specify a course_module ID');
 }
@@ -45,6 +48,24 @@ require_login($course, true, $cm);
 
 $context = context_module::instance($cm->id);
 $PAGE->set_context($context);
+
+$recyclelicenses = get_config('mod_zoom', 'utmost');
+
+
+// Checks whether we need to recycle licenses and acts accordingly.
+if ($recyclelicenses && $webservice->_make_call("users/$zoom->host_id")->type == ZOOM_USER_TYPE_BASIC || 1==1) {
+    if ($webservice->_paid_user_limit_reached()) {
+        $leastrecentlyactivepaiduserid = $webservice->get_paid_user();
+
+        // Changes least_recently_active_user to a basic user so we can use their license.
+        $webservice->_make_call("users/$leastrecentlyactivepaiduserid", array('type' => ZOOM_USER_TYPE_BASIC), 'patch');
+    }
+    // Changes current user to pro so they can make a meeting.
+    $webservice->_make_call("users/$zoom->host_id", array('type' => ZOOM_USER_TYPE_PRO), 'patch');
+}
+
+// Changes current user to pro so they can make a meeting.
+$webservice->_make_call("users/$zoom->host_id", array('type' => ZOOM_USER_TYPE_PRO), 'patch');
 
 require_capability('mod/zoom:view', $context);
 if ($userishost) {
@@ -57,11 +78,11 @@ if ($userishost) {
     if (!empty($gradelist->items) && empty($gradelist->items[0]->grades[$USER->id]->grade)) {
         $grademax = $gradelist->items[0]->grademax;
         $grades = array('rawgrade' => $grademax,
-                        'userid' => $USER->id,
-                        'usermodified' => $USER->id,
-                        'dategraded' => '',
-                        'feedbackformat' => '',
-                        'feedback' => '');
+            'userid' => $USER->id,
+            'usermodified' => $USER->id,
+            'dategraded' => '',
+            'feedbackformat' => '',
+            'feedback' => '');
 
         zoom_grade_item_update($zoom, $grades);
     }
@@ -71,5 +92,5 @@ if ($userishost) {
 
 // Record user's clicking join.
 \mod_zoom\event\join_meeting_button_clicked::create(array('context' => $context, 'objectid' => $zoom->id, 'other' =>
-        array('cmid' => $id, 'meetingid' => (int) $zoom->meeting_id, 'userishost' => $userishost)))->trigger();
+    array('cmid' => $id, 'meetingid' => (int)$zoom->meeting_id, 'userishost' => $userishost)))->trigger();
 redirect($nexturl);

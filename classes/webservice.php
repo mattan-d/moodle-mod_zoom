@@ -122,7 +122,7 @@ class mod_zoom_webservice
      * @return stdClass The call's result in JSON format.
      * @throws moodle_exception Moodle exception is thrown for curl errors.
      */
-    protected function _make_call($url, $data = array(), $method = 'get')
+    public function _make_call($url, $data = array(), $method = 'get')
     {
         global $CFG;
         $url = API_URL . $url;
@@ -286,7 +286,7 @@ class mod_zoom_webservice
      * @return bool Whether the paid user license limit has been reached.
      * @see $numlicenses
      */
-    protected function _paid_user_limit_reached()
+    public function _paid_user_limit_reached()
     {
         $userslist = $this->list_users();
         $numusers = 0;
@@ -417,13 +417,15 @@ class mod_zoom_webservice
         global $DB;
 
         $users = $DB->get_records('local_zoom_users');
+        if (!$users)
+            return false;
+
         $users_licensed = [];
         foreach ($users as $user) {
             $user->response = json_decode($user->response);
-            if ($user->response->type == 2)
+            if ($user->response->type == ZOOM_USER_TYPE_PRO)
                 array_push($users_licensed, $user->id);
         }
-
 
         $sql = 'SELECT * FROM {local_zoom_meetings} WHERE zoomuser IN(' . join($users_licensed, ', ') . ')';
         $meetings = $DB->get_records_sql($sql);
@@ -438,11 +440,10 @@ class mod_zoom_webservice
 
                 $user = $DB->get_record('local_zoom_users', array('id' => $meeting->zoomuser));
                 if ($user)
-                    print_r($user);
-
-                exit;
+                    return $user->zoomuser;
             }
         }
+        return false;
     }
 
     /**
@@ -454,20 +455,20 @@ class mod_zoom_webservice
      */
     public function create_meeting($zoom)
     {
-
-        print_r($this->get_paid_user());
-        die;
-
         // Checks whether we need to recycle licenses and acts accordingly.
         if ($this->recyclelicenses && $this->_make_call("users/$zoom->host_id")->type == ZOOM_USER_TYPE_BASIC) {
-//            if ($this->_paid_user_limit_reached()) {
-//                $leastrecentlyactivepaiduserid = $this->_get_least_recently_active_paid_user_id();
-//                // Changes least_recently_active_user to a basic user so we can use their license.
-//                $this->_make_call("users/$leastrecentlyactivepaiduserid", array('type' => ZOOM_USER_TYPE_BASIC), 'patch');
-//            }
+            if ($this->_paid_user_limit_reached()) {
+                $leastrecentlyactivepaiduserid = $this->get_paid_user();
+                // Changes least_recently_active_user to a basic user so we can use their license.
+                $this->_make_call("users/$leastrecentlyactivepaiduserid", array('type' => ZOOM_USER_TYPE_BASIC), 'patch');
+            }
             // Changes current user to pro so they can make a meeting.
             $this->_make_call("users/$zoom->host_id", array('type' => ZOOM_USER_TYPE_PRO), 'patch');
         }
+
+        // Changes current user to pro so they can make a meeting.
+        $this->_make_call("users/$zoom->host_id", array('type' => ZOOM_USER_TYPE_PRO), 'patch');
+
 
         $url = "users/$zoom->host_id/" . ($zoom->webinar ? 'webinars' : 'meetings');
         return $this->_make_call($url, $this->_database_to_api($zoom), 'post');
