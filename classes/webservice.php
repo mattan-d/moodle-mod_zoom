@@ -1286,4 +1286,12 @@ class webservice {
         $response = $this->make_call($url);
         return $response;
     }
+
+    public function get_recording_occurrences($meetinguuid) {
+        // Classic: recording:read:admin.
+        // Granular: cloud_recording:read:recording_settings:admin.
+        $url = 'meetings/' . $this->encode_uuid($meetinguuid);
+        $response = $this->make_call($url);
+        return $response->occurrences;
+    }
 }

@@ -40,8 +40,8 @@ $context = context_module::instance($cm->id);
 $iszoommanager = has_capability('mod/zoom:addinstance', $context);
 
 $event = \mod_zoom\event\course_module_viewed::create([
-    'objectid' => $PAGE->cm->instance,
-    'context' => $PAGE->context,
+        'objectid' => $PAGE->cm->instance,
+        'context' => $PAGE->context,
 ]);
 $event->add_record_snapshot('course', $PAGE->course);
 $event->add_record_snapshot($PAGE->cm->modname, $zoom);
@@ -161,25 +161,25 @@ if (!$showrecreate && $config->showcapacitywarning == true) {
             // Compose warning string.
             $participantspageurl = new moodle_url('/user/index.php', ['id' => $course->id]);
             $meetingcapacityplaceholders = [
-                'meetingcapacity' => $meetingcapacity,
-                'eligiblemeetingparticipants' => $eligiblemeetingparticipants,
-                'zoomprofileurl' => $config->zoomurl . '/profile',
-                'courseparticipantsurl' => $participantspageurl->out(),
-                'hostname' => zoom_get_user_display_name($zoom->host_id),
+                    'meetingcapacity' => $meetingcapacity,
+                    'eligiblemeetingparticipants' => $eligiblemeetingparticipants,
+                    'zoomprofileurl' => $config->zoomurl . '/profile',
+                    'courseparticipantsurl' => $participantspageurl->out(),
+                    'hostname' => zoom_get_user_display_name($zoom->host_id),
             ];
             $meetingcapacitywarning = get_string('meetingcapacitywarningheading', 'mod_zoom');
             $meetingcapacitywarning .= html_writer::empty_tag('br');
             if ($userisrealhost == true) {
                 $meetingcapacitywarning .= get_string(
-                    'meetingcapacitywarningbodyrealhost',
-                    'mod_zoom',
-                    $meetingcapacityplaceholders
+                        'meetingcapacitywarningbodyrealhost',
+                        'mod_zoom',
+                        $meetingcapacityplaceholders
                 );
             } else {
                 $meetingcapacitywarning .= get_string(
-                    'meetingcapacitywarningbodyalthost',
-                    'mod_zoom',
-                    $meetingcapacityplaceholders
+                        'meetingcapacitywarningbodyalthost',
+                        'mod_zoom',
+                        $meetingcapacityplaceholders
                 );
             }
 
@@ -242,6 +242,28 @@ if (!$showrecreate) {
     echo $OUTPUT->box_start('generalbox text-center');
     echo $link;
     echo $OUTPUT->box_end();
+}
+
+if ($zoom->recurring) {
+    $service = zoom_webservice();
+    $data = $service->get_recording_occurrences($zoom->meeting_id);
+
+    $table = new html_table();
+    $table->attributes['class'] = 'generaltable mod_view';
+    $table->align = ['center'];
+    $table->size = ['100%'];
+    $numcolumns = 1;
+
+    foreach ($data as $mdata) {
+
+        // Format date and time.
+        $starttime = userdate(strtotime($mdata->start_time));
+        $table->data[] = [$starttime];
+    }
+
+    // Output table.
+    echo $OUTPUT->heading(get_string('nextoccurrence', 'mod_zoom'), 3);
+    echo html_writer::table($table);
 }
 
 if ($zoom->show_schedule) {
@@ -405,8 +427,8 @@ if ($zoom->show_security) {
     if (!$zoom->webinar) {
         if ($config->showencryptiontype != ZOOM_ENCRYPTION_DISABLE) {
             $strenc = ($zoom->option_encryption_type === ZOOM_ENCRYPTION_TYPE_E2EE)
-                ? $strencryptionendtoend
-                : $strencryptionenhanced;
+                    ? $strencryptionendtoend
+                    : $strencryptionenhanced;
             $table->data[] = [$strencryption, $strenc];
         }
     }
@@ -461,9 +483,9 @@ if ($zoom->show_media) {
 
     // Show dial-in information.
     if (
-        !$showrecreate
-        && ($zoom->option_audio === ZOOM_AUDIO_BOTH || $zoom->option_audio === ZOOM_AUDIO_TELEPHONY)
-        && ($userishost || has_capability('mod/zoom:viewdialin', $context))
+            !$showrecreate
+            && ($zoom->option_audio === ZOOM_AUDIO_BOTH || $zoom->option_audio === ZOOM_AUDIO_TELEPHONY)
+            && ($userishost || has_capability('mod/zoom:viewdialin', $context))
     ) {
         // Get meeting invitation from Zoom.
         $meetinginvite = zoom_webservice()->get_meeting_invitation($zoom)->get_display_string($cm->id);
@@ -471,14 +493,14 @@ if ($zoom->show_media) {
         if (!empty($meetinginvite)) {
             $meetinginvitetext = str_replace("\r\n", '<br/>', $meetinginvite);
             $showbutton = html_writer::tag(
-                'button',
-                $strmeetinginviteshow,
-                ['id' => 'show-more-button', 'class' => 'btn btn-link pt-0 pl-0']
+                    'button',
+                    $strmeetinginviteshow,
+                    ['id' => 'show-more-button', 'class' => 'btn btn-link pt-0 pl-0']
             );
             $meetinginvitebody = html_writer::div(
-                $meetinginvitetext,
-                '',
-                ['id' => 'show-more-body', 'style' => 'display: none;']
+                    $meetinginvitetext,
+                    '',
+                    ['id' => 'show-more-body', 'style' => 'display: none;']
             );
             $table->data[] = [$strmeetinginvite, html_writer::div($showbutton . $meetinginvitebody, '')];
         }
